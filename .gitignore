@@ -1,0 +1,5 @@
+__pycache__/
+sample_data/
+my_backups/
+benchmark_results.csv
+.DS_Store
