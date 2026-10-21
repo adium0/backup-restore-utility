@@ -27,7 +27,8 @@ def restore_backup(backup_root, name=None, target=None, only=None, overwrite=Fal
     target = os.path.abspath(target or manifest["source"])
 
     if is_inside(target, backup_root):
-        raise BackupError("Cannot restore into the backup folder itself")
+        raise BackupError(f"Can't restore into {target}: that is the backup location "
+                          f"({backup_root}) or inside it. Choose a different folder to restore into.")
 
     files = manifest["files"]
     if only:

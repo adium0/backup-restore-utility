@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="api-token" content="{{TOKEN}}">
+  <title>Backup &amp; Restore</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="page-header">
+    <h1>Automated File Backup &amp; Restore</h1>
+    <p class="subtitle">Timestamped versions · unchanged files hard-linked · SHA-256 verified</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Folders</h2>
+      <label for="source">Folder to back up</label>
+      <div class="field-row">
+        <input id="source" type="text" spellcheck="false" placeholder="/Users/you/Documents/project">
+        <button class="secondary pick" data-pick="source" type="button">Choose…</button>
+        <button class="secondary reveal" data-reveal="source" type="button" title="Show this folder in Finder">Open</button>
+      </div>
+      <label for="dest">Backup location</label>
+      <div class="field-row">
+        <input id="dest" type="text" spellcheck="false" placeholder="/Users/you/my_backups">
+        <button class="secondary pick" data-pick="dest" type="button">Choose…</button>
+        <button class="secondary reveal" data-reveal="dest" type="button" title="Show this folder in Finder">Open</button>
+      </div>
+    </section>
+
+    <nav class="tabs" role="tablist">
+      <button role="tab" id="tab-btn-backup" data-tab="backup" aria-selected="true">Backup</button>
+      <button role="tab" id="tab-btn-versions" data-tab="versions" aria-selected="false">
+        Versions &amp; Restore <span id="version-count" class="badge" hidden></span>
+      </button>
+      <button role="tab" id="tab-btn-log" data-tab="log" aria-selected="false">Log</button>
+      <button role="tab" id="tab-btn-lab" data-tab="lab" aria-selected="false">Test Lab</button>
+    </nav>
+
+    <section class="card tab-panel" id="tab-backup" role="tabpanel">
+      <div class="two-col">
+        <div>
+          <label for="keep">Versions to keep</label>
+          <input id="keep" type="number" min="1" max="100" value="3">
+        </div>
+        <div>
+          <label for="exclude">Also skip</label>
+          <input id="exclude" type="text" spellcheck="false" placeholder="*.log, build/*">
+          <p class="hint">Always skipped: <span id="default-excludes"></span></p>
+        </div>
+      </div>
+      <label class="check">
+        <input type="checkbox" id="full">
+        <span>Full backup <span class="hint">copy every file instead of hard-linking unchanged ones</span></span>
+      </label>
+      <div class="actions">
+        <button class="primary action" id="btn-backup" type="button">Create Backup</button>
+        <button class="secondary action" id="btn-status" type="button">Show Changes Since Last Backup</button>
+      </div>
+    </section>
+
+    <section class="card tab-panel" id="tab-versions" role="tabpanel" hidden>
+      <div class="table-wrap">
+        <table id="versions">
+          <thead>
+            <tr>
+              <th class="pick-col"></th><th>#</th><th>Version</th><th>Mode</th>
+              <th class="num">Files</th><th class="num">Size</th>
+              <th class="num">Copied</th><th class="num">Linked</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="no-versions" class="empty">No backups here yet. Create one in the Backup tab.</p>
+      </div>
+      <div class="actions">
+        <button class="secondary action" id="btn-refresh" type="button">Refresh</button>
+        <button class="secondary action" id="btn-verify" type="button">Verify Selected</button>
+      </div>
+
+      <h3>Files in <span class="pill" id="files-version">latest</span>
+        <button class="link" id="btn-reveal-version" type="button" hidden>Show in Finder</button></h3>
+      <p class="hint">Click a file to restore just that one.</p>
+      <div class="table-wrap files-wrap">
+        <table id="version-files">
+          <thead><tr><th>File</th><th class="num">Size</th><th>Stored</th><th>Modified</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <h3>Restore <span class="pill" id="restore-version">latest</span>
+        <button class="link" id="btn-use-latest" type="button" hidden>use latest</button></h3>
+      <label for="target">Restore into</label>
+      <div class="field-row">
+        <input id="target" type="text" spellcheck="false" placeholder="Leave blank to restore into the original folder">
+        <button class="secondary pick" data-pick="target" type="button">Choose…</button>
+      </div>
+      <label for="only">Only this file or folder</label>
+      <input id="only" type="text" spellcheck="false" list="only-options"
+             placeholder="Leave blank to restore everything, e.g. Projects/hello.py">
+      <datalist id="only-options"></datalist>
+      <label class="check">
+        <input type="checkbox" id="overwrite">
+        <span>Overwrite files that differ from the backup</span>
+      </label>
+      <div class="actions">
+        <button class="primary action" id="btn-restore" type="button">Restore</button>
+      </div>
+    </section>
+
+    <section class="card tab-panel" id="tab-log" role="tabpanel" hidden>
+      <pre id="log" class="console"></pre>
+      <div class="actions">
+        <button class="secondary" id="btn-log" type="button">Refresh</button>
+      </div>
+    </section>
+
+    <section class="card tab-panel" id="tab-lab" role="tabpanel" hidden>
+      <p class="intro">Cause problems on purpose, then use the other tabs to show that the tool
+        notices and recovers. Every result says what to try next.</p>
+
+      <h3>1. Change your files</h3>
+      <p class="hint">Works on the "Folder to back up". Only files that are in the latest backup
+        can be edited or deleted here, so you can always restore them.</p>
+      <label for="lab-source-file">File in your folder</label>
+      <select id="lab-source-file"></select>
+      <div class="actions">
+        <button class="secondary action" id="lab-edit" type="button">Edit file</button>
+        <button class="secondary action danger" id="lab-delete-source" type="button">Delete file</button>
+        <button class="secondary action" id="lab-add" type="button">Add a new file</button>
+      </div>
+
+      <h3>2. Damage a backup</h3>
+      <div class="lab-pair">
+        <div>
+          <label for="lab-version">Version</label>
+          <select id="lab-version"></select>
+        </div>
+        <div>
+          <label for="lab-backup-file">File inside that version</label>
+          <select id="lab-backup-file"></select>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="secondary action danger" id="lab-corrupt" type="button">Corrupt file (flip 1 byte)</button>
+        <button class="secondary action danger" id="lab-delete-backup" type="button">Delete file from backup</button>
+      </div>
+      <div class="actions">
+        <button class="secondary action" id="lab-crash" type="button">Simulate a crash mid-backup</button>
+        <button class="secondary action" id="lab-attack" type="button">Try a path-traversal attack</button>
+      </div>
+
+      <h3>3. Look inside: hard links</h3>
+      <label for="lab-link-file">File</label>
+      <select id="lab-link-file"></select>
+      <div class="actions">
+        <button class="secondary action" id="lab-links" type="button">Show inode numbers &amp; link counts</button>
+      </div>
+
+      <h3>Demo folders</h3>
+      <p class="hint">The sample_data/ and my_backups/ folders next to gui.py.</p>
+      <div class="actions">
+        <button class="secondary action" id="lab-sample" type="button">Create sample data</button>
+        <button class="secondary action danger" id="lab-reset" type="button">Reset demo (start fresh)</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="output-head">
+        <h2>Output</h2>
+        <button class="link" id="btn-clear" type="button">Clear</button>
+      </div>
+      <div id="output" class="console" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer class="status-bar">
+    <span class="spinner" id="spinner" hidden></span>
+    <span id="status">Ready.</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
